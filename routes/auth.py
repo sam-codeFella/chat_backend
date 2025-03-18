@@ -23,6 +23,11 @@ class Token(BaseModel):
     token: str
     token_type: str
 
+class UserResponse(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
+
 @router.post("/auth/login", response_model=Token)
 async def login(user_data: UserLogin, db: Session = Depends(get_db)):
     # Find user by email
@@ -89,4 +94,26 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
         data={"sub": new_user.email}, expires_delta=access_token_expires
     )
     
-    return {"token": access_token, "token_type": "bearer"} 
+    return {"token": access_token, "token_type": "bearer"}
+
+@router.get("/auth/user", response_model=UserResponse)
+async def get_user(email: str = None, username: str = None, db: Session = Depends(get_db)):
+    if not email and not username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either email or username must be provided",
+        )
+    
+    query = db.query(User)
+    if email:
+        user = query.filter(User.email == email).first()
+    else:
+        user = query.filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    
+    return UserResponse(email=user.email, username=user.username, password=user.hashed_password)
