@@ -1,13 +1,15 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import uuid
 from .db import Base
 
 # what kind of models are these ? & what exactly is sqlalchemy ? -> seems quite awesome.
 class User(Base):
     __tablename__ = "users"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     email = Column(String, unique=True, index=True)
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
@@ -22,7 +24,7 @@ class Chat(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -36,7 +38,7 @@ class Message(Base):
     content = Column(Text)
     role = Column(String)  # 'user' or 'assistant'
     chat_id = Column(Integer, ForeignKey("chats.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
