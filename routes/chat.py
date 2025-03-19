@@ -12,9 +12,16 @@ from uuid import UUID
 router = APIRouter()
 chat_service = ChatService()
 
+
+
 class MessageCreate(BaseModel):
     content: str
     role: str = "user"
+    id: UUID
+
+class ChatCreate(BaseModel):
+    message: MessageCreate
+    id: UUID
 
 class MessageResponse(BaseModel):
     id: UUID
@@ -28,21 +35,26 @@ class ChatResponse(BaseModel):
     created_at: datetime
     messages: List[MessageResponse]
 
+# Create chat function.
 @router.post("/chats", response_model=ChatResponse)
 async def create_chat(
-    message: MessageCreate,
+    new_chat: ChatCreate,
     current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # Create new chat
-    chat_title = await chat_service.create_chat_title(message.content)
-    chat = Chat(title=chat_title, user_id=current_user.id)
+    print(new_chat.message.content)
+    print(new_chat.id)
+    chat_title = await chat_service.create_chat_title(new_chat.message.content)
+    chat = Chat(id=new_chat.id, title=chat_title, user_id=current_user.id)
     db.add(chat)
     db.commit()
     
     # Add initial message
+    # the UUID is obtained from the request at the moment. -> mandatory to be achieved from the api call only.
     user_message = Message(
-        content=message.content,
+        id = new_chat.message.id,
+        content=new_chat.message.content,
         role="user",
         chat_id=chat.id,
         user_id=current_user.id
@@ -50,7 +62,10 @@ async def create_chat(
     db.add(user_message)
     
     # Generate AI response
-    ai_response = await chat_service.generate_response([{"role": "user", "content": message.content}])
+    ai_response = await chat_service.generate_response([{"role": "user", "content": new_chat.message.content}])
+    
+    # yeah see here it was able to create the message UUID by itself.
+
     ai_message = Message(
         content=ai_response,
         role="assistant",
