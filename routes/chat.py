@@ -7,6 +7,7 @@ from services.auth import get_current_user
 from sqlalchemy.orm import Session
 from database.models import Chat, Message, User
 from database.db import get_db
+from uuid import UUID
 
 router = APIRouter()
 chat_service = ChatService()
@@ -16,13 +17,13 @@ class MessageCreate(BaseModel):
     role: str = "user"
 
 class MessageResponse(BaseModel):
-    id: int
+    id: UUID
     content: str
     role: str
     created_at: datetime
 
 class ChatResponse(BaseModel):
-    id: int
+    id: UUID
     title: str
     created_at: datetime
     messages: List[MessageResponse]
@@ -81,9 +82,9 @@ async def create_chat(
 
 @router.post("/chats/{chat_id}/messages", response_model=MessageResponse)
 async def create_message(
-    chat_id: int,
+    chat_id: UUID,
     message: MessageCreate,
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # Get chat history
@@ -150,8 +151,8 @@ async def get_chats(
 
 @router.get("/chats/{chat_id}", response_model=ChatResponse)
 async def get_chat(
-    chat_id: int,
-    current_user: str = Depends(get_current_user),
+    chat_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     chat = db.query(Chat).filter(Chat.id == chat_id, Chat.user_id == current_user.id).first()
