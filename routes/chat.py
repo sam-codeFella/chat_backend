@@ -12,8 +12,6 @@ from uuid import UUID
 router = APIRouter()
 chat_service = ChatService()
 
-
-
 class MessageCreate(BaseModel):
     content: str
     role: str = "user"
@@ -36,49 +34,71 @@ class ChatResponse(BaseModel):
     messages: List[MessageResponse]
 
 # Create chat function.
+# This is a function to retrieve in case of new chat's & it's subsequent interactions are maintained here only.
+# The other calls are used to populate the frontend chat history & everything.
+# I am writing this very poorly - rewrite & rethink this.
+# it will maintain context & be rendered.
 @router.post("/chats", response_model=ChatResponse)
 async def create_chat(
-    new_chat: ChatCreate,
+    chat: ChatCreate,
     current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Create new chat
-    print(new_chat.message.content)
-    print(new_chat.id)
-    chat_title = await chat_service.create_chat_title(new_chat.message.content)
-    chat = Chat(id=new_chat.id, title=chat_title, user_id=current_user.id)
-    db.add(chat)
-    db.commit()
+    chat_id = chat.id
+    message_id = chat.message.id
+    chat_created_at = None
+    chat_title = None
+
+    existing_chat = db.query(Chat).filter(Chat.id == chat_id, Chat.user_id == current_user.id).first()
+
+    if existing_chat:
+        chat_created_at = existing_chat.created_at
+        chat_title = existing_chat.title
+    else:
+        chat_title = await chat_service.create_chat_title(chat.message.content)
+        # is the chatDTO required outside this scope ?
+        chatDTO = Chat(id=chat.id, title=chat_title, user_id=current_user.id)
+        chat_created_at = chatDTO.created_at
+        db.add(chatDTO)
+        db.commit()
+
     
     # Add initial message
     # the UUID is obtained from the request at the moment. -> mandatory to be achieved from the api call only.
+    # every message is also saved here.
     user_message = Message(
-        id = new_chat.message.id,
-        content=new_chat.message.content,
+        id = message_id,
+        content=chat.message.content,
         role="user",
-        chat_id=chat.id,
+        chat_id=chat_id,
         user_id=current_user.id
     )
     db.add(user_message)
     
     # Generate AI response
-    ai_response = await chat_service.generate_response([{"role": "user", "content": new_chat.message.content}])
-    
+    ai_response = await chat_service.generate_response([{"role": "user", "content": chat.message.content}])
+
     # yeah see here it was able to create the message UUID by itself.
 
     ai_message = Message(
         content=ai_response,
         role="assistant",
-        chat_id=chat.id,
+        chat_id=chat_id,
         user_id=current_user.id
     )
     db.add(ai_message)
     db.commit()
-    
+
+    # due to my bad implementation above. this is suffering.
+    # You know the fuck up. -> Fixed it by extracting the return object fields.
+
+    # why  does the return consist the entire list ? - This is a bit of heavy packet size.
+    # let's see how we can do better at this.
+    # client disconnectivity may be the main reason.
     return ChatResponse(
-        id=chat.id,
-        title=chat.title,
-        created_at=chat.created_at,
+        id=chat_id,
+        title=chat_title,
+        created_at=chat_created_at,
         messages=[
             MessageResponse(
                 id=user_message.id,
