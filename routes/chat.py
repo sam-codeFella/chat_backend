@@ -5,7 +5,7 @@ from datetime import datetime
 from services.chat import ChatService
 from services.auth import get_current_user
 from sqlalchemy.orm import Session
-from database.models import Chat, Message, User
+from database.models import Chat, Message, User, Vote
 from database.db import get_db
 from uuid import UUID
 
@@ -33,6 +33,16 @@ class ChatResponse(BaseModel):
     created_at: datetime
     messages: List[MessageResponse]
 
+class VoteResponse(BaseModel):
+    id: str
+    chat_id: UUID
+    message_id: UUID
+    type: str
+    created_at: datetime
+
+class VoteUpdateRequest(BaseModel):
+    type: str
+
 # Create chat function.
 # This is a function to retrieve in case of new chat's & it's subsequent interactions are maintained here only.
 # The other calls are used to populate the frontend chat history & everything.
@@ -58,9 +68,9 @@ async def create_chat(
         chat_title = await chat_service.create_chat_title(chat.message.content)
         # is the chatDTO required outside this scope ?
         chatDTO = Chat(id=chat.id, title=chat_title, user_id=current_user.id)
-        chat_created_at = chatDTO.created_at
         db.add(chatDTO)
         db.commit()
+        chat_created_at = chatDTO.created_at
 
     
     # Add initial message
@@ -206,4 +216,85 @@ async def get_chat(
                 created_at=msg.created_at
             ) for msg in chat.messages
         ]
-    ) 
+    )
+
+@router.get("/chats/{chat_id}/votes", response_model=List[VoteResponse])
+async def get_votes_by_chat_id(
+    chat_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Check if chat exists and user has access
+    chat = db.query(Chat).filter(Chat.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    
+    if chat.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this chat")
+    
+    # Get all votes for the chat
+    votes = db.query(Vote).filter(Vote.chat_id == str(chat_id)).all()
+    
+    return [
+        VoteResponse(
+            id=vote.id,
+            chat_id=vote.chat_id,
+            message_id=vote.message_id,
+            type=vote.type,
+            created_at=vote.created_at
+        ) for vote in votes
+    ]
+
+@router.put("/chats/{chat_id}/messages/{message_id}/vote", response_model=VoteResponse)
+async def update_vote(
+    chat_id: UUID,
+    message_id: UUID,
+    vote_update: VoteUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Check if chat exists and user has access
+    chat = db.query(Chat).filter(Chat.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    
+    if chat.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this chat")
+    
+    # Check if message exists in the chat
+    message = db.query(Message).filter(
+        Message.id == message_id,
+        Message.chat_id == chat_id
+    ).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found in this chat")
+    
+    # Find existing vote or create new one
+    vote = db.query(Vote).filter(
+        Vote.chat_id == str(chat_id),
+        Vote.message_id == str(message_id)
+    ).first()
+    
+    if vote:
+        # Update existing vote
+        vote.type = vote_update.type
+    else:
+        # Create new vote
+        vote = Vote(
+            chat_id=str(chat_id),
+            message_id=str(message_id),
+            type=vote_update.type
+        )
+        db.add(vote)
+    
+    db.commit()
+    db.refresh(vote)
+
+    # what's happening here ?
+    return VoteResponse(
+        id=vote.id,
+        chat_id=vote.chat_id,
+        message_id=vote.message_id,
+        type=vote.type,
+        created_at=vote.created_at
+    )

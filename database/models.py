@@ -19,6 +19,7 @@ class User(Base):
     chats = relationship("Chat", back_populates="user")
     messages = relationship("Message", back_populates="user")
 
+#
 class Chat(Base):
     __tablename__ = "chats"
     
@@ -30,6 +31,7 @@ class Chat(Base):
     # Relationships
     user = relationship("User", back_populates="chats")
     messages = relationship("Message", back_populates="chat")
+    votes = relationship("Vote", back_populates="chat")
 
 class Message(Base):
     __tablename__ = "messages"
@@ -43,4 +45,18 @@ class Message(Base):
     
     # Relationships
     chat = relationship("Chat", back_populates="messages")
-    user = relationship("User", back_populates="messages") 
+    user = relationship("User", back_populates="messages")
+    votes = relationship("Vote", back_populates="message")
+
+
+class Vote(Base):
+    __tablename__ = "votes"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    chat_id = Column(UUID, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False)
+    message_id = Column(UUID, ForeignKey("messages.id", ondelete="CASCADE"), nullable=False)
+    type = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    chat = relationship("Chat", back_populates="votes")
+    message = relationship("Message", back_populates="votes")

@@ -1,6 +1,5 @@
 from sqlalchemy import text
-from .db import engine, Base
-from .models import User, Chat, Message
+from database.db import engine, Base
 
 def recreate_tables():
     # Drop all tables

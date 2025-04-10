@@ -90,6 +90,7 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    # my access token only takes new_user's email into the dict context.
     access_token = create_access_token(
         data={"sub": new_user.email}, expires_delta=access_token_expires
     )

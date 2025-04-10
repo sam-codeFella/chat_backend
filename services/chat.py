@@ -17,7 +17,11 @@ class ChatService:
         self.system_prompt = """You are a helpful AI assistant that provides accurate, 
         informative, and engaging responses. Always strive to give detailed explanations 
         and cite sources when possible."""
-    
+
+    """
+    So here we are passing all the list of messages earlier received as well. 
+    Maybe this helps further in understanding the context & allows for better reasoning as well. 
+    """
     async def generate_response(self, messages: List[Dict[str, str]]) -> str:
         # Convert the messages to LangChain format
         langchain_messages = [
