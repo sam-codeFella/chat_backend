@@ -60,3 +60,43 @@ class Vote(Base):
     # Relationships
     chat = relationship("Chat", back_populates="votes")
     message = relationship("Message", back_populates="votes")
+
+class Company(Base):
+    __tablename__ = "company"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    ticker = Column(String, unique=True, index=True)
+    name = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    documents = relationship("Document", back_populates="company")
+    chunks = relationship("Chunk", back_populates="company")
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("company.id", ondelete="CASCADE"), nullable=False)
+    text = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    company = relationship("Company", back_populates="documents")
+    chunks = relationship("Chunk", back_populates="document")
+
+
+class Chunk(Base):
+    __tablename__ = "chunks"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("company.id", ondelete="CASCADE"), nullable=False)
+    text = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    document = relationship("Document", back_populates="chunks")
+    company = relationship("Company", back_populates="chunks")
+
